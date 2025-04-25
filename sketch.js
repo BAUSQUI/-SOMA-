@@ -1,6 +1,7 @@
 let cols, rows;
 let spacing = 60;
 let points = [];
+let maxColsRows = 10;
 let broches = [];
 let letras = ['S', 'O', 'M', 'A'];
 let letraIndex = 0;
@@ -12,19 +13,19 @@ let minDistance = 80;
 let fontSizeSlider;
 let shouldExpand = false;
 let resetButton;
-let gridSize = 10; // Changed from 10 to 30
-let mostrarGrilla = false;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
   userStartAudio();
-
+  
   frameRate(10);
-
+  
+  // Crear slider
   fontSizeSlider = createSlider(20, 80, 48, 1);
   fontSizeSlider.position(10, height + 20);
   fontSizeSlider.style('width', '580px');
-
+  
+  // Crear botón de reset
   resetButton = createButton('Limpiar Cuerpo');
   resetButton.position(600, height + 15);
   resetButton.mousePressed(resetSketch);
@@ -34,13 +35,15 @@ function setup() {
   resetButton.style('padding', '1px 15px');
   resetButton.style('cursor', 'pointer');
   resetButton.style('font-family', 'Archivo');
-
+  
+  // Aplicar estilos minimalistas directamente
   fontSizeSlider.style('background', 'transparent');
   fontSizeSlider.style('border', 'none');
   fontSizeSlider.style('height', '4px');
   fontSizeSlider.style('outline', 'none');
   fontSizeSlider.style('-webkit-appearance', 'none');
-
+  
+  // Estilizar la pista del slider (fondo)
   let style = document.createElement('style');
   style.innerHTML = `
     input[type=range]::-webkit-slider-runnable-track {
@@ -78,10 +81,8 @@ function setup() {
   `;
   document.head.appendChild(style);
 
- 
   textFont('Archivo');
-  textStyle(BOLD);
-
+  textStyle("BOLD");
   noiseDetail(3, 0.5);
 
   initializePoints();
@@ -107,63 +108,18 @@ function resetSketch() {
   initializePoints();
 }
 
-function snapToGrid(x, y) {
-  let cellSize = min(width, height) / gridSize;
-  let gridX = round((x - width / 2 + cellSize * gridSize / 2) / cellSize) * cellSize + width / 2 - cellSize * gridSize / 2;
-  let gridY = round((y - height / 2 + cellSize * gridSize / 2) / cellSize) * cellSize + height / 2 - cellSize * gridSize / 2;
-  return createVector(gridX, gridY);
-}
-
-function drawGridClipped(shapePoints) {
-  let pg = createGraphics(width, height);
-  let mask = createGraphics(width, height);
-
-  // Dibujar la forma en la máscara
-  mask.beginShape();
-  for (let i = 0; i <= shapePoints.length; i++) {
-    let p = shapePoints[i % shapePoints.length];
-    if (i === 0) {
-      mask.vertex(p.x, p.y);
-    } else {
-      mask.curveVertex(p.x, p.y);
-    }
-  }
-  mask.endShape(CLOSE);
-
-  // Dibujar la grilla
-  pg.stroke(255);
-  pg.strokeWeight(1);
-  let cellSize = min(width, height) / gridSize;
-  let startX = width / 2 - (gridSize * cellSize) / 2;
-  let startY = height / 2 - (gridSize * cellSize) / 2;
-
-  for (let i = 0; i <= gridSize; i++) {
-    let x = startX + i * cellSize;
-    pg.line(x, startY, x, startY + gridSize * cellSize);
-  }
-
-  for (let j = 0; j <= gridSize; j++) {
-    let y = startY + j * cellSize;
-    pg.line(startX, y, startX + gridSize * cellSize, y);
-  }
-
-  // Aplicar máscara
-  pg.drawingContext.globalCompositeOperation = 'destination-in';
-  pg.image(mask, 0, 0);
-
-  image(pg, 0, 0);
-}
-
 function draw() {
   background(0);
 
+  // Expansión del círculo blanco
   if (shouldExpand) {
     liquidRadius = lerp(liquidRadius, targetRadius, radiusLerpAmt);
   }
 
   let dynamicRadius = liquidRadius * (fontSizeSlider.value() / 48);
-  let deformedPoints = [];
 
+  // Deformar puntos por broches
+  let deformedPoints = [];
   for (let i = 0; i < points.length; i++) {
     let angle = map(i, 0, points.length, 0, TWO_PI);
     let baseR = liquidRadius + map(noise(cos(angle) * 1, sin(angle) * 1), 0, 1, -40, 40);
@@ -183,7 +139,7 @@ function draw() {
     deformedPoints.push(deformedP);
   }
 
-  // Forma blanca
+  // Dibujar forma blanca central
   fill(255);
   noStroke();
   beginShape();
@@ -194,10 +150,7 @@ function draw() {
   }
   endShape(CLOSE);
 
-  if (mostrarGrilla) {
-    drawGridClipped(deformedPoints);
-  }
-
+  // Actualizar y mostrar broches
   for (let b of broches) {
     b.update();
     b.display(fontSizeSlider.value());
@@ -205,14 +158,16 @@ function draw() {
 }
 
 function mousePressed() {
+  // Verificar clic en broche existente
   for (let b of broches) {
     if (b.isMouseOver(fontSizeSlider.value())) {
       b.dragging = true;
-      b.playSound();
+      b.playSound(); // Reproducir sonido al arrastrar
       return;
     }
   }
 
+  // Crear nuevo broche
   let dynamicRadius = liquidRadius * (fontSizeSlider.value() / 48);
   if (dist(mouseX, mouseY, width / 2, height / 2) < dynamicRadius * 0.8) {
     let canPlace = true;
@@ -227,31 +182,19 @@ function mousePressed() {
       if (broches.length === 0 && !shouldExpand) {
         shouldExpand = true;
       }
-      let snappedPos = snapToGrid(mouseX, mouseY);
       let letra = letras[letraIndex];
       letraIndex = (letraIndex + 1) % letras.length;
-      let nuevoBroche = new Broche(snappedPos.x, snappedPos.y, letra);
+      let nuevoBroche = new Broche(mouseX, mouseY, letra);
       broches.push(nuevoBroche);
-      nuevoBroche.playSound();
+      nuevoBroche.playSound(); // Reproducir sonido al colocar
     }
   }
 }
 
 function mouseReleased() {
   for (let b of broches) {
-    if (b.dragging) {
-      let snappedPos = snapToGrid(b.pos.x, b.pos.y);
-      b.pos.set(snappedPos.x, snappedPos.y);
-      b.target.set(snappedPos.x, snappedPos.y);
-    }
     b.dragging = false;
-    b.stopSound();
-  }
-}
-
-function keyPressed() {
-  if (key === 'g' || key === 'G') {
-    mostrarGrilla = !mostrarGrilla;
+    b.stopSound(); // Detener sonido al soltar
   }
 }
 
@@ -262,8 +205,8 @@ class Broche {
     this.dragging = false;
     this.letra = letra;
     this.r = 30;
-    this.sound = loadSound('assets/paper.wav');
-    this.sound.setLoop(true);
+    this.sound = loadSound('assets/paper.wav'); // Sonido individual
+    this.sound.setLoop(true); // Loop continuo mientras se arrastra
   }
 
   playSound() {
@@ -284,6 +227,7 @@ class Broche {
     }
     this.pos.lerp(this.target, 0.15);
 
+    // Mantener dentro del área
     let dynamicRadius = liquidRadius * (fontSizeSlider.value() / 48);
     let centerDist = dist(this.pos.x, this.pos.y, width / 2, height / 2);
     if (centerDist > dynamicRadius * 0.9) {
